@@ -1,0 +1,38 @@
+name: Release
+
+# Tags river-common so consumers can pin `river-config = { git = ..., tag = "<version>" }`.
+on:
+  push:
+    branches: [main]
+    paths: ['src/**', 'Cargo.toml']
+
+env:
+  MISE_AUTO_INSTALL: false
+
+jobs:
+  release:
+    name: Tag release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: jdx/mise-action@v4
+        with:
+          install_args: cocogitto
+      - name: configure git
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+      - id: version
+        run: |
+          echo "version=$(mise run ci:release-version)" >> "$GITHUB_OUTPUT"
+          echo "last=$(git describe --tags --abbrev=0 2>/dev/null || true)" >> "$GITHUB_OUTPUT"
+      - run: mise run ci:release-publish
+        if: steps.version.outputs.version != '' && steps.version.outputs.version != steps.version.outputs.last
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
